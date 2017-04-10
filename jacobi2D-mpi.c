@@ -47,10 +47,10 @@ int main(int argc, char * argv[])
   sscanf(argv[2], "%d", &max_iters);
 
   /* compute number of unknowns handled by each process */
-  double logp = log(numtasks)/log(4);
-  sp = (int) sqrt(numtasks);
-  if ((logp-(int)logp !=0 || N % sp != 0 ) && rank == 0 ) {
-    printf("N: %d, p: %d\n", N, numtasks);
+  double logp = log(p)/log(4);
+  sp = (int) sqrt(p);
+  if ((logp-(int)logp !=0 || N % sp != 0 ) && mpirank == 0 ) {
+    printf("N: %d, p: %d\n", N, p);
     printf("Exiting. log4(p) must be an integer and N must be multiple of (2^j)\n");
     MPI_Abort(MPI_COMM_WORLD, 0);
   }
@@ -77,8 +77,10 @@ int main(int argc, char * argv[])
   /* initial residual */
   gres0 = compute_residual(lu, M, hsq);
   gres = gres0;
+  if (mpirank == 0)
+    printf("Iter 0 Residual %g\n", gres0);
 
-  for (iter = 0; iter < max_iters && gres > epsilon*gres0; iter++) {
+  for (iter = 1; iter < max_iters && gres > epsilon*gres0; iter++) {
 
     /* Jacobi step for local points */
     for (i = M + 1; i <= M * (M-1) - 2; i++){
@@ -87,34 +89,34 @@ int main(int argc, char * argv[])
     }
 
     /* communicate ghost values */
-    if (mpirank < p - sq) {
+    if (mpirank < p - sp) {
       /* If not the up bdry processes, send/recv bdry values to the up */
       MPI_Send(&(lunew[(M-2)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 121, MPI_COMM_WORLD);
       MPI_Recv(&(lunew[(M-1)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 122, MPI_COMM_WORLD, &status);
     }
-    if (mpirank >= sq) {
+    if (mpirank >= sp) {
       /* If not the bottom bdry processes, send/recv bdry values to the below */
       MPI_Send(&(lunew[M+1]), lN, MPI_DOUBLE, mpirank-sp, 122, MPI_COMM_WORLD);
       MPI_Recv(&(lunew[1]), lN, MPI_DOUBLE, mpirank-sp, 121, MPI_COMM_WORLD, &status1);
     }
-    if (mpirank % sq !=0){
+    if (mpirank % sp !=0){
       /* If not the left bdry processes, send/recv bdry values to the left */
       for (j = 1; j <= lN; j++){
         leftsend[j-1] = lunew[j*M+1];
       }
-      MPI_Send(&leftsend, lN, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD);
-      MPI_Recv(&leftrecv, lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &status2);
+      MPI_Send(leftsend, lN, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD);
+      MPI_Recv(leftrecv, lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &status2);
       for (j = 1; j <= lN; j++){
         lunew[j*M] = leftrecv[j-1];
       }
     }
-    if (mpirank % sq != sq - 1){
+    if (mpirank % sp != sp - 1){
        /* If not the right bdry processes, send/recv bdry values to the right */
       for (j = 1; j <= lN; j++){
         rightsend[j-1] = lunew[j*M+lN];
       }
-      MPI_Send(&rightsend, lN, MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD);
-      MPI_Recv(&rightrecv, lN, MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD, &status3);
+      MPI_Send(rightsend, lN, MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD);
+      MPI_Recv(rightrecv, lN, MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD, &status3);
       for (j = 1; j <= lN; j++){
         lunew[j*M+lN+1] = rightrecv[j-1];
       }
@@ -124,7 +126,7 @@ int main(int argc, char * argv[])
     /* copy newu to u using pointer flipping */
     lutemp = lu; lu = lunew; lunew = lutemp;
     if (0 == (iter % 10)) {
-      gres = compute_residual(lu, lN, invhsq);
+      gres = compute_residual(lu, M, hsq);
       if (0 == mpirank) {
 	printf("Iter %d: Residual: %g\n", iter, gres);
       }
