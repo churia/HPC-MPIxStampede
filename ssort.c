@@ -22,9 +22,9 @@ static int compare(const void *a, const void *b)
 int main( int argc, char *argv[])
 {
   int rank,root=0;
-  int i, N;
+  int i, j, N;
   int *vec, *sample, *rbuf, *split;
-  int *scounts, *rcounts, *sdispls, *rdispls;
+  int *scounts, *rcounts, *sdispls, *rdispls, *rray;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -65,7 +65,7 @@ int main( int argc, char *argv[])
    * split the data into P buckets of approximately the same size */
   if (rank == root){
     qsort(rbuf, N, sizeof(int), compare);
-    split = (int *) calloc(p-1,sizeof(int));
+    split = (int *) calloc(p-1, sizeof(int));
     for(i = 1; i < p; i++){
       split[i-1] = rbuf[i*p];
     }
@@ -76,17 +76,45 @@ int main( int argc, char *argv[])
 
   /* every processor uses the obtained splitters to decide
    * which integers need to be sent to which other processor (local bins) */
-  for(i = 0; i < N; i++){
 
+  scounts = (int *) calloc(p, sizeof(int));
+  rcounts = (int *) calloc(p, sizeof(int));
+  sdispls = (int *) calloc(p, sizeof(int));
+  rdispls = (int *) calloc(p, sizeof(int));
+
+  /*decide the number of data to send to each processor based on splitters*/
+  j = 0;
+  for(i = 0; i < N; i++){
+    if(vec[i] < split[j])
+      scounts[j]++;
+    else
+      scounts[++j]++;
   }
 
-  /* send and receive: either you use MPI_AlltoallV, or
-   * (and that might be easier), use an MPI_Alltoall to share
-   * with every processor how many integers it should expect,
-   * and then use MPI_Send and MPI_Recv to exchange the data */
+  /* tell the other processors how much data is coming */
+  MPI_Alltoall(scounts, 1, MPI_INT, rcounts, 1, MPI_INT, MPI_COMM_WORLD);
+  /* calculate displacements and the size of the arrays */
+  sdispls[0] = 0;
+  for(i = 1; i < p; i++){
+    sdispls[i] = scounts[i-1] + sdispls[i-1];
+  }
+  rdispls[0] = 0;
+  for(i = 1; i < p; i++){
+    rdispls[i] = rcounts[i-1] + rdispls[i-1];
+  }
+  
+  int rsize = 0;
+  for(i = 0; i < p; i++){
+    rsize += rcounts[i];
+  }
+  
+  rray = (int *) calloc(rsize, sizeof(int));
+  MPI_Alltoallv(vec, scounts,sdisp,MPI_INT,
+                rray,rcounts,rdisp,MPI_INT, MPI_COMM_WORLD);
 
   /* do a local sort */
-  qsort(vec, N?, sizeof(int), compare);
+  int *temp = vec; vec = rray; rray = vec;
+  qsort(vec, rsize, sizeof(int), compare);
 
   /* every processor writes its result to a file */
   FILE* fd = NULL;
@@ -110,6 +138,8 @@ int main( int argc, char *argv[])
   free(vec);
   free(sample);
   free(split);
+  free(scounts);free(rcounts); free(sdispls); free(rdispls); 
+  free(rray);
   if (rank == root){
     free(rbuf);
   }
