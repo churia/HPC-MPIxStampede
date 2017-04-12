@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <mpi.h>
 #include <stdlib.h>
-
+#include "util.h"
 
 static int compare(const void *a, const void *b)
 {
@@ -29,6 +29,17 @@ int main( int argc, char *argv[])
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &p);
+
+  /* get name of host running MPI process */
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int name_len;
+  MPI_Get_processor_name(processor_name, &name_len);
+  printf("Rank %d/%d running on %s.\n", mpirank, p, processor_name);
+
+  /* timing */
+  MPI_Barrier(MPI_COMM_WORLD);
+  timestamp_type time1, time2;
+  get_timestamp(&time1);
 
   /* Number of random numbers per processor (this should be increased
    * for actual tests or could be passed in through the command line */
@@ -147,7 +158,7 @@ int main( int argc, char *argv[])
   fprintf(fd,"\n");
   fclose(fd);
 
-  /*finalize*/
+  /*clean*/
   free(vec);
   free(sample);
   free(split);
@@ -156,6 +167,15 @@ int main( int argc, char *argv[])
   if (rank == root){
     free(rbuf);
   }
+
+  /* timing */
+  MPI_Barrier(MPI_COMM_WORLD);
+  get_timestamp(&time2);
+  double elapsed = timestamp_diff_in_seconds(time1,time2);
+  if (0 == mpirank) {
+    printf("Time elapsed is %f seconds.\n", elapsed);
+  }
+  
   MPI_Finalize();
   return 0;
 }
