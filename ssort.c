@@ -22,7 +22,7 @@ static int compare(const void *a, const void *b)
 int main( int argc, char *argv[])
 {
   int rank,p,root=0;
-  int i, j, N, pN,rsize;
+  int i, j, N, s,rsize;
   int *vec, *sample, *rbuf, *split;
   int *scounts, *rcounts, *sdispls, *rdispls, *rray;
 
@@ -44,51 +44,59 @@ int main( int argc, char *argv[])
   /* Number of random numbers per processor (this should be increased
    * for actual tests or could be passed in through the command line */
   sscanf(argv[1], "%d", &N);
-  pN = N/p;
-
+  s = N/p;
+  if(s*p<N) //sample 1 more for scaling
+    s+=1;
   vec = calloc(N, sizeof(int));
   /* seed random number generator differently on every core */
   srand((unsigned int) (rank + 393919));
 
   /* fill vector with random integers */
   for (i = 0; i < N; ++i) {
-    vec[i] = rand();
+    vec[i] = (int)rand();
   }
   printf("rank: %d, first entry: %d\n", rank, vec[0]);
-
+  //for (i = 0; i < N; ++i) {
+  //printf("rank: %d, %d\n", rank, vec[i]);
+  //}
   /* sort locally */
   qsort(vec, N, sizeof(int), compare);
 
   /* randomly sample s entries from vector or select local splitters,
    * i.e., every N/P-th entry of the sorted vector */
-  sample = (int *) calloc(pN, sizeof(int));
-  for (i = 1; i <= pN; i++){
-    sample[i-1] = vec[i*N/(pN+1)];
+  sample = (int *) calloc(s, sizeof(int));
+  for (i = 1; i <= s; i++){
+    sample[i-1] = vec[i*N/(s+1)];
   }
 
   /* every processor communicates the selected entries
    * to the root processor; use for instance an MPI_Gather */
   if (rank == root){
-    rbuf = (int *) calloc(N, sizeof(int));
+    rbuf = (int *) calloc(s*p, sizeof(int));
   }
-  MPI_Gather(sample, pN, MPI_INT, rbuf, pN, MPI_INT, root, MPI_COMM_WORLD);
+  
+  MPI_Gather(sample, s, MPI_INT, rbuf, s, MPI_INT, root, MPI_COMM_WORLD);
 
+  MPI_Barrier(MPI_COMM_WORLD);
   /* root processor does a sort, determinates splitters that
    * split the data into P buckets of approximately the same size */
   split = (int *) calloc(p-1, sizeof(int));
   if (rank == root){
     printf("finish sampling..\n");
-    qsort(rbuf, N, sizeof(int), compare);
-//    for (i = 0; i< N; i++)
-//      printf("%d ", rbuf[i]);
-//    printf("\n");
+    //for (i = 0; i< s*p; i++)
+    //  printf("%d ", rbuf[i]);
+    //printf("\n");
+    qsort(rbuf, s*p, sizeof(int), compare);
+    //for (i = 0; i< s*p; i++)
+    //  printf("%d ", rbuf[i]);
+    //printf("\n");
     for(i = 1; i < p; i++){
-      split[i-1] = rbuf[i*pN];
+      split[i-1] = rbuf[i*s];
     }
     printf("bcast splitters..\n");
-//    for(i=0;i<p-1;i++)
-//      printf("%d ",split[i]);
-//    printf("\n");
+    //for(i=0;i<p-1;i++)
+    //  printf("%d ",split[i]);
+    //printf("\n");
   }
 
   /* root process broadcasts splitters */
