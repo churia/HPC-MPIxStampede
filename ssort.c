@@ -41,7 +41,7 @@ int main( int argc, char *argv[])
 
   /* fill vector with random integers */
   for (i = 0; i < N; ++i) {
-    vec[i] = rand()%100 +1;
+    vec[i] = rand();
   }
   printf("rank: %d, first entry: %d\n", rank, vec[0]);
 
@@ -66,18 +66,18 @@ int main( int argc, char *argv[])
    * split the data into P buckets of approximately the same size */
   split = (int *) calloc(p-1, sizeof(int));
   if (rank == root){
+    printf("finish sampling..\n");
     qsort(rbuf, N, sizeof(int), compare);
-    printf("rbuf\n");
-    for (i = 0; i< N; i++)
-      printf("%d ", rbuf[i]);
-    printf("\n");
+//    for (i = 0; i< N; i++)
+//      printf("%d ", rbuf[i]);
+//    printf("\n");
     for(i = 1; i < p; i++){
       split[i-1] = rbuf[i*pN];
     }
-    printf("bcastsplit:\n");
-    for(i=0;i<p-1;i++)
-      printf("%d ",split[i]);
-    printf("\n");
+    printf("bcast splitters..\n");
+//    for(i=0;i<p-1;i++)
+//      printf("%d ",split[i]);
+//    printf("\n");
   }
 
   /* root process broadcasts splitters */

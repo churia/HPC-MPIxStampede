@@ -1,6 +1,6 @@
 CC = mpicc
-FLAGS = -O3 -Wall
-TARGET = mpi_solved1 mpi_solved2 mpi_solved3 mpi_solved4 mpi_solved5 mpi_solved6 mpi_solved7
+FLAGS = -O3 -Wall -lm
+TARGET = mpi_solved1 mpi_solved2 mpi_solved3 mpi_solved4 mpi_solved5 mpi_solved6 mpi_solved7 jacobi2D-mpi ssort
 
 all: $(TARGET)
 
