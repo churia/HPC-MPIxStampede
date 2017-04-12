@@ -34,7 +34,7 @@ int main( int argc, char *argv[])
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   int name_len;
   MPI_Get_processor_name(processor_name, &name_len);
-  printf("Rank %d/%d running on %s.\n", mpirank, p, processor_name);
+  printf("Rank %d/%d running on %s.\n", rank, p, processor_name);
 
   /* timing */
   MPI_Barrier(MPI_COMM_WORLD);
@@ -175,7 +175,7 @@ int main( int argc, char *argv[])
   if (0 == mpirank) {
     printf("Time elapsed is %f seconds.\n", elapsed);
   }
-  
+
   MPI_Finalize();
   return 0;
 }
