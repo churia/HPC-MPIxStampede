@@ -141,6 +141,7 @@ int main( int argc, char *argv[])
   }
   
   rray = (int *) calloc(rsize, sizeof(int));
+  printf("rank %d is sending data to the others..\n",rank);
   MPI_Alltoallv(vec, scounts,sdispls,MPI_INT,
                 rray,rcounts,rdispls,MPI_INT, MPI_COMM_WORLD);
 
