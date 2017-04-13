@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
       for (j = 1; j <= lN; j++){
         t = j * M + 1;
         lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
-        leftsend[j-1] = lunew[j*M+1];
+        leftsend[j-1] = lunew[t];
       }
       MPI_Isend(leftsend, lN, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD, &request_out3);
       MPI_Irecv(leftrecv, lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &request_in3);
@@ -144,13 +144,17 @@ int main(int argc, char * argv[])
     if (mpirank % sp !=0){
       MPI_Wait(&request_out3, &status);
       MPI_Wait(&request_in3, &status);
+    }
+    if (mpirank % sp != sp - 1){
+      MPI_Wait(&request_out4, &status);
+      MPI_Wait(&request_in4, &status);
+    }
+    if (mpirank % sp !=0){
       for (j = 1; j <= lN; j++){
         lunew[j*M] = leftrecv[j-1];
       }
     }
     if (mpirank % sp != sp - 1){
-      MPI_Wait(&request_out4, &status);
-      MPI_Wait(&request_in4, &status);
       for (j = 1; j <= lN; j++){
         lunew[j*M+lN+1] = rightrecv[j-1];
       }
