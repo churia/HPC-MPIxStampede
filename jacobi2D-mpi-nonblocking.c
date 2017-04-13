@@ -31,7 +31,7 @@ double compute_residual(double *lu, int M, double hsq)
 int main(int argc, char * argv[])
 {
   int mpirank, i, j,t, p, sp, N, lN, M, iter, max_iters;
-  MPI_Status status, status1, status2, status3;
+  MPI_Status status;//, status1, status2, status3;
   MPI_Request request_out1, request_in1;
   MPI_Request request_out2, request_in2;
   MPI_Request request_out3, request_in3;
@@ -99,7 +99,7 @@ int main(int argc, char * argv[])
     if (mpirank >= sp) {
       /* If not the bottom bdry processes, send/recv bdry values to the below */
       for (j = 1; j <= lN; j++){
-        t = M + 1 + j;
+        t = M + j;
         lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
       }
       MPI_Isend(&(lunew[M+1]), lN, MPI_DOUBLE, mpirank-sp, 122, MPI_COMM_WORLD, &request_out2);
