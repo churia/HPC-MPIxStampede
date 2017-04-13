@@ -128,7 +128,7 @@ int main(int argc, char * argv[])
 
     /* Jacobi step for local points */
     for (i = 2 * M + 2; i < M * (M-2) - 2; i++){
-      if(lN > 2 && i % M != 0 && i % M != M-1 && i % M != 1 && i % M != M-2) //pass border points!
+      if(i % M != 0 && i % M != M-1 && i % M != 1 && i % M != M-2) //pass border points!
         lunew[i]  = 0.25 * (hsq + lu[i-M] + lu[i-1] + lu[i+1] + lu[i+M]);
     }
 
