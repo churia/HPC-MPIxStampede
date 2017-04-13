@@ -85,32 +85,32 @@ int main(int argc, char * argv[])
     printf("Iter 0 Residual %g\n", gres0);
 
   for (iter = 1; iter <= max_iters && gres > epsilon*gres0; iter++) {
-
+    /* compute bdry values */
+    for (j = 1; j <= lN; j++){
+        t = (M-2) * M + j;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+        t = M + j;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+        t = j * M + 1;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+        t = j * M + lN;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+    }
     /* communicate ghost values */
     if (mpirank < p - sp) {
       /* If not the up bdry processes, send/recv bdry values to the up */
-      for (j = 1; j <= lN; j++){
-        t = (M-2) * M + j;
-        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
-      }
       MPI_Isend(&(lunew[(M-2)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 121, MPI_COMM_WORLD, &request_out1);
       MPI_Irecv(&(lunew[(M-1)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 122, MPI_COMM_WORLD, &request_in1);
     }
     if (mpirank >= sp) {
       /* If not the bottom bdry processes, send/recv bdry values to the below */
-      for (j = 1; j <= lN; j++){
-        t = M + j;
-        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
-      }
       MPI_Isend(&(lunew[M+1]), lN, MPI_DOUBLE, mpirank-sp, 122, MPI_COMM_WORLD, &request_out2);
       MPI_Irecv(&(lunew[1]), lN, MPI_DOUBLE, mpirank-sp, 121, MPI_COMM_WORLD, &request_in2);
     }
     if (mpirank % sp !=0){
       /* If not the left bdry processes, send/recv bdry values to the left */
       for (j = 1; j <= lN; j++){
-        t = j * M + 1;
-        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
-        leftsend[j-1] = lunew[t];
+        leftsend[j-1] = lunew[j*M+1];
       }
       MPI_Isend(leftsend, lN, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD, &request_out3);
       MPI_Irecv(leftrecv, lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &request_in3);
@@ -118,9 +118,7 @@ int main(int argc, char * argv[])
     if (mpirank % sp != sp - 1){
        /* If not the right bdry processes, send/recv bdry values to the right */
       for (j = 1; j <= lN; j++){
-        t = j * M + lN;
-        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
-        rightsend[j-1] = lunew[t];
+        rightsend[j-1] = lunew[j*M+lN];
       }
       MPI_Isend(rightsend, lN, MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD, &request_out4);
       MPI_Irecv(rightrecv, lN, MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD, &request_in4);
@@ -149,6 +147,7 @@ int main(int argc, char * argv[])
       MPI_Wait(&request_out4, &status);
       MPI_Wait(&request_in4, &status);
     }
+    /* update by received data*/
     if (mpirank % sp !=0){
       for (j = 1; j <= lN; j++){
         lunew[j*M] = leftrecv[j-1];
