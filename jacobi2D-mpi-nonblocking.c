@@ -30,8 +30,12 @@ double compute_residual(double *lu, int M, double hsq)
 
 int main(int argc, char * argv[])
 {
-  int mpirank, i, j, p, sp, N, lN, M, iter, max_iters;
+  int mpirank, i, j,t, p, sp, N, lN, M, iter, max_iters;
   MPI_Status status, status1, status2, status3;
+  MPI_Request request_out1, request_in1;
+  MPI_Request request_out2, request_in2;
+  MPI_Request request_out3, request_in3;
+  MPI_Request request_out4, request_in4;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
@@ -82,47 +86,75 @@ int main(int argc, char * argv[])
 
   for (iter = 1; iter <= max_iters && gres > epsilon*gres0; iter++) {
 
-    /* Jacobi step for local points */
-    for (i = M + 1; i <= M * (M-1) - 2; i++){
-      if(i % M != 0 && i % M != M-1 ) //pass border points!
-        lunew[i]  = 0.25 * (hsq + lu[i-M] + lu[i-1] + lu[i+1] + lu[i+M]);
-    }
-
     /* communicate ghost values */
     if (mpirank < p - sp) {
       /* If not the up bdry processes, send/recv bdry values to the up */
-      MPI_Send(&(lunew[(M-2)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 121, MPI_COMM_WORLD);
-      MPI_Recv(&(lunew[(M-1)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 122, MPI_COMM_WORLD, &status);
+      for (j = 1; j <= lN; j++){
+        t = (M-2) * M + j;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+      }
+      MPI_Isend(&(lunew[(M-2)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 121, MPI_COMM_WORLD, &request_out1);
+      MPI_Irecv(&(lunew[(M-1)*M+1]), lN, MPI_DOUBLE, mpirank+sp, 122, MPI_COMM_WORLD, &request_in1);
     }
     if (mpirank >= sp) {
       /* If not the bottom bdry processes, send/recv bdry values to the below */
-      MPI_Send(&(lunew[M+1]), lN, MPI_DOUBLE, mpirank-sp, 122, MPI_COMM_WORLD);
-      MPI_Recv(&(lunew[1]), lN, MPI_DOUBLE, mpirank-sp, 121, MPI_COMM_WORLD, &status1);
+      for (j = 1; j <= lN; j++){
+        t = M + 1 + j;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+      }
+      MPI_Isend(&(lunew[M+1]), lN, MPI_DOUBLE, mpirank-sp, 122, MPI_COMM_WORLD, &request_out2);
+      MPI_Irecv(&(lunew[1]), lN, MPI_DOUBLE, mpirank-sp, 121, MPI_COMM_WORLD, &request_in2);
     }
     if (mpirank % sp !=0){
       /* If not the left bdry processes, send/recv bdry values to the left */
       for (j = 1; j <= lN; j++){
+        t = j * M + 1;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
         leftsend[j-1] = lunew[j*M+1];
       }
-      MPI_Send(leftsend, lN, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD);
-      MPI_Recv(leftrecv, lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &status2);
+      MPI_Isend(leftsend, lN, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD, &request_out3);
+      MPI_Irecv(leftrecv, lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &request_in3);
+    }
+    if (mpirank % sp != sp - 1){
+       /* If not the right bdry processes, send/recv bdry values to the right */
+      for (j = 1; j <= lN; j++){
+        t = j * M + lN;
+        lunew[t]  = 0.25 * (hsq + lu[t-M] + lu[t-1] + lu[t+1] + lu[t+M]);
+        rightsend[j-1] = lunew[t];
+      }
+      MPI_Isend(rightsend, lN, MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD, &request_out4);
+      MPI_Irecv(rightrecv, lN, MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD, &request_in4);
+    }
+
+    /* Jacobi step for local points */
+    for (i = 2 * M + 2; i < M * (M-2) - 2; i++){
+      if(lN > 2 && i % M != 0 && i % M != M-1 && i % M != 1 && i % M != M-2) //pass border points!
+        lunew[i]  = 0.25 * (hsq + lu[i-M] + lu[i-1] + lu[i+1] + lu[i+M]);
+    }
+
+    /* check if Isend/Irecv are done */
+    if (mpirank < p - sp) {
+      MPI_Wait(&request_out1, &status);
+      MPI_Wait(&request_in1, &status);
+    }
+    if (mpirank >= sp) {
+      MPI_Wait(&request_out2, &status);
+      MPI_Wait(&request_in2, &status);
+    }
+    if (mpirank % sp !=0){
+      MPI_Wait(&request_out3, &status);
+      MPI_Wait(&request_in3, &status);
       for (j = 1; j <= lN; j++){
         lunew[j*M] = leftrecv[j-1];
       }
     }
     if (mpirank % sp != sp - 1){
-       /* If not the right bdry processes, send/recv bdry values to the right */
-      for (j = 1; j <= lN; j++){
-        rightsend[j-1] = lunew[j*M+lN];
-      }
-      MPI_Send(rightsend, lN, MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD);
-      MPI_Recv(rightrecv, lN, MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD, &status3);
+      MPI_Wait(&request_out4, &status);
+      MPI_Wait(&request_in4, &status);
       for (j = 1; j <= lN; j++){
         lunew[j*M+lN+1] = rightrecv[j-1];
       }
     }
-
-
     /* copy newu to u using pointer flipping */
     lutemp = lu; lu = lunew; lunew = lutemp;
     if (0 == (iter % 10)) {
