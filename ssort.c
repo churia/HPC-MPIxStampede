@@ -22,7 +22,7 @@ static int compare(const void *a, const void *b)
 int main( int argc, char *argv[])
 {
   int rank,p,root=0;
-  int i, j, N, s,rsize;
+  long i, j, N, s,rsize;
   int *vec, *sample, *rbuf, *split;
   int *scounts, *rcounts, *sdispls, *rdispls, *rray;
 
@@ -43,7 +43,7 @@ int main( int argc, char *argv[])
 
   /* Number of random numbers per processor (this should be increased
    * for actual tests or could be passed in through the command line */
-  sscanf(argv[1], "%d", &N);
+  sscanf(argv[1], "%ld", &N);
   s = N/p;
   if(s*p<N) //sample 1 more for scaling
     s+=1;
@@ -82,7 +82,7 @@ int main( int argc, char *argv[])
    * split the data into P buckets of approximately the same size */
   split = (int *) calloc(p-1, sizeof(int));
   if (rank == root){
-    printf("finish sampling..\n");
+    printf("finish sampling.. length of sampled vector: %ld\n",s*p);
     //for (i = 0; i< s*p; i++)
     //  printf("%d ", rbuf[i]);
     //printf("\n");
