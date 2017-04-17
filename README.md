@@ -1,7 +1,7 @@
 # MPI experiments on Stampede
 
 After compiling:
-- mpi_bugX
+- mpi_solvedX
 - Jacobi2D-mpi
 - Jacobi2D-mpi-nonblocking
 - ssort
