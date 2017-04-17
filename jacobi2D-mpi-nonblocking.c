@@ -131,14 +131,6 @@ int main(int argc, char * argv[])
     }
 
     /* check if Isend/Irecv are done */
-    if (mpirank < p - sp) {
-      MPI_Wait(&request_out1, &status);
-      MPI_Wait(&request_in1, &status);
-    }
-    if (mpirank >= sp) {
-      MPI_Wait(&request_out2, &status);
-      MPI_Wait(&request_in2, &status);
-    }
     if (mpirank % sp !=0){
       MPI_Wait(&request_out3, &status);
       MPI_Wait(&request_in3, &status);
@@ -157,6 +149,14 @@ int main(int argc, char * argv[])
       for (j = 1; j <= lN; j++){
         lunew[j*M+lN+1] = rightrecv[j-1];
       }
+    }
+    if (mpirank < p - sp) {
+      MPI_Wait(&request_out1, &status);
+      MPI_Wait(&request_in1, &status);
+    }
+    if (mpirank >= sp) {
+      MPI_Wait(&request_out2, &status);
+      MPI_Wait(&request_in2, &status);
     }
     /* copy newu to u using pointer flipping */
     lutemp = lu; lu = lunew; lunew = lutemp;
